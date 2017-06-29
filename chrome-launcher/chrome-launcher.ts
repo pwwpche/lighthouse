@@ -55,13 +55,13 @@ export class LaunchManager {
   private instance?: Launcher;
   private opts: Options;
   private isSigintBound: boolean;
-  private maxLaunchAttempts: number;
-  private attempts: number;
+  private maxAttempts: number;
+  private failedAttempts: number;
 
   constructor() {
     this.isSigintBound = false;
-    this.maxLaunchAttempts = 3;
-    this.attempts = 1;
+    this.maxAttempts = 3;
+    this.failedAttempts = 0;
   }
 
   setOptions(opts: Options = {}) {
@@ -69,12 +69,9 @@ export class LaunchManager {
   }
 
   async launchInstance(): Promise<LaunchedChrome> {
-    if (this.instance) {
-      Promise.reject(new Error('Already a launcher instance, can\'t create a second.'));
-    }
+    console.assert(!this.instance, 'Already a launcher instance, can\'t create a second.');
 
     this.instance = new Launcher(this.opts);
-
     this.handleSigint();
     await this.instance.launch().catch(err => {
       return this.retry(err);
@@ -88,21 +85,21 @@ export class LaunchManager {
   }
 
   async retry(err: LighthouseError) {
-    if (err.code !== 'ECONNREFUSED') {
-      Promise.reject(err);
-    }
-    this.attempts++;
-    if (this.attempts <= this.maxLaunchAttempts) {
-      log.warn(
-          'ChromeLauncher',
-          `Connection refused. Retrying attempt #${this.attempts}/${this.maxLaunchAttempts}`);
-    } else {
-      log.error('ChromeLauncher', 'Reached maximum relaunch attempts. Quitting...');
-      return Promise.reject(err);
-    }
+    if (err.code !== 'ECONNREFUSED') return Promise.reject(err);
 
+    // clean up the chrome process
     await this.instance!.kill();
     this.instance = undefined;
+
+    // begin the retry attempt (or quit as we've tried enough)
+    this.failedAttempts++;
+    if (this.failedAttempts <= this.maxAttempts - 1) {
+      const attemptCount = `${this.failedAttempts}/${this.maxAttempts}`;
+      log.warn('ChromeLauncher', `Connection refused. Attempt ${attemptCount} failed. Retrying...`);
+    } else {
+      log.error('ChromeLauncher', 'Reached maximum launch attempts. Quitting...');
+      return Promise.reject(err);
+    }
     return this.launchInstance();
   }
 
