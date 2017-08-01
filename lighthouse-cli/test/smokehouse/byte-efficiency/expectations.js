@@ -13,17 +13,16 @@ module.exports = [
     initialUrl: 'http://localhost:10200/byte-efficiency/tester.html',
     url: 'http://localhost:10200/byte-efficiency/tester.html',
     audits: {
-      // TODO: re-enable once CSS protocol has stabilized
-      // 'unused-css-rules': {
-      //   score: false,
-      //   extendedInfo: {
-      //     value: {
-      //       results: {
-      //         length: 2
-      //       }
-      //     }
-      //   }
-      // },
+      'unused-css-rules': {
+        score: '<100',
+        extendedInfo: {
+          value: {
+            results: {
+              length: 2
+            }
+          }
+        }
+      },
       'offscreen-images': {
         score: '<100',
         extendedInfo: {
